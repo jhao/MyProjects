@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>管理员后台 - 原型</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+      background: #f8fafc;
+      color: #111827;
+      font-size: 13px;
+    }
+    button, input, select { font: inherit; }
+    header {
+      height: 60px;
+      background: #fff;
+      border-bottom: 1px solid #e2e8f0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 17px; }
+    .logo { width: 32px; height: 32px; border-radius: 8px; background: #111827; color: #fff; display: grid; place-items: center; }
+    main { padding: 18px 20px 28px; }
+    .topline { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 14px; }
+    h1 { font-size: 20px; margin: 0 0 4px; }
+    .muted { color: #64748b; }
+    .btn {
+      border: 0;
+      background: #2563eb;
+      color: #fff;
+      border-radius: 6px;
+      min-height: 34px;
+      padding: 7px 12px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .btn.secondary { background: #fff; color: #2563eb; border: 1px solid #bfdbfe; }
+    .btn.text { background: transparent; color: #2563eb; padding: 4px 6px; min-height: 26px; }
+    .btn.danger { background: #dc2626; }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 12px; }
+    .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 14px; }
+    .card span { color: #64748b; display: block; margin-bottom: 5px; }
+    .card strong { font-size: 20px; }
+    .filter { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; display: grid; grid-template-columns: 1.5fr 160px 160px auto; gap: 10px; align-items: end; margin-bottom: 12px; }
+    label { display: block; font-size: 12px; color: #64748b; margin-bottom: 4px; }
+    input, select { width: 100%; min-height: 34px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px 9px; background: #fff; }
+    .tablebox { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
+    table { width: 100%; border-collapse: collapse; }
+    th { background: #f8fafc; color: #475569; font-size: 12px; text-align: left; padding: 10px; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
+    td { padding: 10px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+    tr:hover td { background: #f8fafc; }
+    .tag { display: inline-flex; align-items: center; border-radius: 999px; padding: 2px 8px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+    .tag.green { background: #dcfce7; color: #15803d; }
+    .tag.red { background: #fee2e2; color: #b91c1c; }
+    .tag.gray { background: #e2e8f0; color: #334155; }
+    .ops { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
+    .usage { width: 130px; height: 7px; background: #e2e8f0; border-radius: 999px; overflow: hidden; margin-top: 4px; }
+    .bar { height: 100%; background: #2563eb; }
+    .modal-mask { position: fixed; inset: 0; background: rgba(15,23,42,.38); display: none; place-items: center; padding: 20px; }
+    .modal-mask.show { display: grid; }
+    .modal { width: min(520px, 100%); background: #fff; border-radius: 8px; border: 1px solid #e2e8f0; padding: 18px; }
+    .modal h2 { margin: 0 0 12px; font-size: 17px; }
+    .formgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+    .toast { position: fixed; right: 18px; bottom: 18px; background: #111827; color: #fff; padding: 10px 14px; border-radius: 6px; opacity: 0; transform: translateY(8px); transition: .2s; }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    a { color: #2563eb; text-decoration: none; }
+    @media (max-width: 960px) {
+      .stats { grid-template-columns: repeat(2, 1fr); }
+      .filter { grid-template-columns: 1fr 1fr; }
+      .tablebox { overflow-x: auto; }
+      table { min-width: 980px; }
+    }
+    @media (max-width: 620px) {
+      header { padding: 0 12px; }
+      main { padding: 12px; }
+      .stats, .filter, .formgrid { grid-template-columns: 1fr; }
+      .topline { align-items: stretch; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand"><div class="logo">AD</div><span>管理员后台</span></div>
+    <div><a href="app.html">项目工作台</a> <span class="muted">|</span> <a href="auth.html">退出</a></div>
+  </header>
+  <main>
+    <section class="topline">
+      <div>
+        <h1>用户管理与用量统计</h1>
+        <div class="muted">管理所有用户，查看项目数量、附件数量和磁盘占用。</div>
+      </div>
+      <button class="btn" onclick="openModal('新增用户')">新增用户</button>
+    </section>
+
+    <section class="stats">
+      <div class="card"><span>用户总数</span><strong>128</strong></div>
+      <div class="card"><span>启用用户</span><strong>119</strong></div>
+      <div class="card"><span>项目总数</span><strong>3,482</strong></div>
+      <div class="card"><span>附件总占用</span><strong>286 GB</strong></div>
+    </section>
+
+    <section class="filter">
+      <div><label>检索用户</label><input placeholder="邮箱 / 昵称"></div>
+      <div><label>状态</label><select><option>全部</option><option>启用</option><option>冻结</option></select></div>
+      <div><label>角色</label><select><option>全部</option><option>普通用户</option><option>管理员</option></select></div>
+      <button class="btn secondary" onclick="showToast('用户列表已刷新')">筛选</button>
+    </section>
+
+    <section class="tablebox">
+      <table>
+        <thead>
+          <tr>
+            <th>用户</th>
+            <th>角色</th>
+            <th>状态</th>
+            <th>项目数量</th>
+            <th>附件数量</th>
+            <th>附件磁盘占用</th>
+            <th>最近登录</th>
+            <th style="text-align:right;">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>张经理</strong><br><span class="muted">zhang@example.com</span></td>
+            <td>普通用户</td>
+            <td><span class="tag green">启用</span></td>
+            <td>42</td>
+            <td>1,268</td>
+            <td>18.6 GB<div class="usage"><div class="bar" style="width:37%"></div></div></td>
+            <td>2026-06-23 09:18</td>
+            <td><div class="ops"><button class="btn text" onclick="openModal('编辑用户')">编辑</button><button class="btn text" onclick="showToast('已发送临时密码')">重置密码</button><button class="btn text" onclick="showToast('用户已冻结')">冻结</button></div></td>
+          </tr>
+          <tr>
+            <td><strong>李商务</strong><br><span class="muted">li@example.com</span></td>
+            <td>普通用户</td>
+            <td><span class="tag green">启用</span></td>
+            <td>27</td>
+            <td>804</td>
+            <td>7.2 GB<div class="usage"><div class="bar" style="width:14%"></div></div></td>
+            <td>2026-06-22 17:42</td>
+            <td><div class="ops"><button class="btn text" onclick="openModal('编辑用户')">编辑</button><button class="btn text" onclick="showToast('已发送临时密码')">重置密码</button><button class="btn text" onclick="showToast('用户已冻结')">冻结</button></div></td>
+          </tr>
+          <tr>
+            <td><strong>王项目</strong><br><span class="muted">wang@example.com</span></td>
+            <td>普通用户</td>
+            <td><span class="tag red">冻结</span></td>
+            <td>9</td>
+            <td>166</td>
+            <td>1.1 GB<div class="usage"><div class="bar" style="width:3%"></div></div></td>
+            <td>2026-05-29 11:03</td>
+            <td><div class="ops"><button class="btn text" onclick="openModal('编辑用户')">编辑</button><button class="btn text" onclick="showToast('已发送临时密码')">重置密码</button><button class="btn text" onclick="showToast('用户已启用')">启用</button></div></td>
+          </tr>
+          <tr>
+            <td><strong>系统管理员</strong><br><span class="muted">admin@example.com</span></td>
+            <td>管理员</td>
+            <td><span class="tag green">启用</span></td>
+            <td>0</td>
+            <td>0</td>
+            <td>0 MB<div class="usage"><div class="bar" style="width:0%"></div></div></td>
+            <td>2026-06-23 08:40</td>
+            <td><div class="ops"><button class="btn text" onclick="openModal('编辑用户')">编辑</button><button class="btn text" onclick="showToast('管理员密码已重置')">重置密码</button><button class="btn text">保护账号</button></div></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <div id="modalMask" class="modal-mask">
+    <section class="modal">
+      <h2 id="modalTitle">新增用户</h2>
+      <div class="formgrid">
+        <div><label>邮箱</label><input value="new@example.com"></div>
+        <div><label>昵称</label><input value="新用户"></div>
+        <div><label>角色</label><select><option>普通用户</option><option>管理员</option></select></div>
+        <div><label>状态</label><select><option>启用</option><option>冻结</option></select></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn secondary" onclick="closeModal()">取消</button>
+        <button class="btn" onclick="closeModal(); showToast('用户信息已保存')">保存</button>
+      </div>
+    </section>
+  </div>
+  <div id="toast" class="toast"></div>
+  <script>
+    function openModal(title) {
+      document.getElementById('modalTitle').textContent = title;
+      document.getElementById('modalMask').classList.add('show');
+    }
+    function closeModal() {
+      document.getElementById('modalMask').classList.remove('show');
+    }
+    function showToast(text) {
+      const toast = document.getElementById('toast');
+      toast.textContent = text;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 1800);
+    }
+  </script>
+</body>
+</html>
+

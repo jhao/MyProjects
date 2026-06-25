@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>管理员后台 - 事务项目管理系统</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="logo dark">AD</span><strong>管理员后台</strong></div>
+    <div class="top-actions"><a href="/app">项目工作台</a><button id="logoutBtn" class="secondary small">退出</button></div>
+  </header>
+  <main class="page">
+    <section class="title-row"><div><h1>用户管理与用量统计</h1><p class="muted">新增、编辑、重置密码、冻结启用，并查看项目数量和附件占用。</p></div><button id="newUserBtn" class="primary">新增用户</button></section>
+    <section class="metrics">
+      <div><span>用户总数</span><strong id="userTotal">0</strong></div>
+      <div><span>项目总数</span><strong id="projectTotal">0</strong></div>
+      <div><span>附件总数</span><strong id="fileTotal">0</strong></div>
+      <div><span>附件占用</span><strong id="diskTotal">0 MB</strong></div>
+    </section>
+    <section class="table-card">
+      <table>
+        <thead><tr><th>用户</th><th>角色</th><th>状态</th><th>项目数量</th><th>附件数量</th><th>附件占用</th><th>最近登录</th><th class="right">操作</th></tr></thead>
+        <tbody id="userRows"></tbody>
+      </table>
+    </section>
+    <section class="title-row status-title"><div><h1>项目状态维护</h1><p class="muted">维护系统默认项目状态，保存后同步到所有普通用户。</p></div><button id="newStatusBtn" class="primary">新增状态</button></section>
+    <section class="table-card">
+      <table>
+        <thead><tr><th>状态名称</th><th>颜色</th><th>类型</th><th>排序</th><th>启用</th><th class="right">操作</th></tr></thead>
+        <tbody id="statusRows"></tbody>
+      </table>
+    </section>
+  </main>
+  <div id="modal" class="modal hidden"></div>
+  <div id="toast" class="toast"></div>
+  <script src="{{ url_for('static', filename='js/common.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+</body>
+</html>

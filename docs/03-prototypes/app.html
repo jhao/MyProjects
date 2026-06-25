@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>项目工作台 - 原型</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+      background: #f8fafc;
+      color: #111827;
+      font-size: 13px;
+    }
+    button, input, select, textarea { font: inherit; }
+    header {
+      height: 60px;
+      background: #fff;
+      border-bottom: 1px solid #e2e8f0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      position: sticky;
+      top: 0;
+      z-index: 5;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 17px; }
+    .logo { width: 32px; height: 32px; border-radius: 8px; background: #2563eb; color: #fff; display: grid; place-items: center; }
+    .userbar { display: flex; align-items: center; gap: 10px; color: #475569; }
+    .avatar { width: 30px; height: 30px; border-radius: 50%; background: #0f766e; color: #fff; display: grid; place-items: center; font-weight: 700; }
+    .logout { border: 1px solid #cbd5e1; background: #fff; color: #334155; border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+    main { padding: 18px 20px 26px; }
+    .toolbar {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 14px;
+      display: grid;
+      grid-template-columns: 1.35fr 1fr 1.08fr 1.16fr 1fr 1fr;
+      gap: 10px;
+      align-items: end;
+      margin-bottom: 12px;
+    }
+    .toolbar .wide { grid-column: span 2; }
+    .toolbar .actions { display: flex; justify-content: flex-end; align-items: end; }
+    label { display: block; font-size: 12px; color: #64748b; margin-bottom: 4px; }
+    input, select, textarea {
+      width: 100%;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      min-height: 34px;
+      padding: 6px 9px;
+      background: #fff;
+      color: #111827;
+    }
+    input:focus, select:focus, textarea:focus { outline: 2px solid #bfdbfe; border-color: #2563eb; }
+    .checks {
+      min-height: 34px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      background: #fff;
+      padding: 5px 7px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 10px;
+      align-items: center;
+    }
+    .check {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
+      color: #334155;
+      white-space: nowrap;
+    }
+    .check input { width: 14px; height: 14px; min-height: 14px; padding: 0; }
+    .date-range { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .btn {
+      border: 0;
+      background: #2563eb;
+      color: #fff;
+      border-radius: 6px;
+      min-height: 34px;
+      padding: 7px 12px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .btn.secondary { background: #fff; color: #2563eb; border: 1px solid #bfdbfe; }
+    .btn.warn { background: #d97706; }
+    .btn.danger { background: #dc2626; }
+    .btn.text { background: transparent; color: #2563eb; padding: 4px 6px; min-height: 26px; }
+    .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 12px; }
+    .metric { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 14px; }
+    .metric span { color: #64748b; display: block; margin-bottom: 4px; }
+    .metric strong { font-size: 20px; }
+    .tablebox { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
+    table { width: 100%; border-collapse: collapse; }
+    th { background: #f8fafc; color: #475569; font-size: 12px; text-align: left; padding: 10px 10px; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
+    .sort {
+      border: 0;
+      background: transparent;
+      color: inherit;
+      padding: 0;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      gap: 4px;
+      align-items: center;
+    }
+    .sort::after { content: "↕"; color: #94a3b8; font-size: 11px; }
+    .sort.asc::after { content: "↑"; color: #2563eb; }
+    .sort.desc::after { content: "↓"; color: #2563eb; }
+    td { padding: 10px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+    tr:hover td { background: #f8fafc; }
+    .project-link { border: 0; background: transparent; color: #2563eb; cursor: pointer; font-weight: 700; padding: 0; text-align: left; }
+    .muted { color: #64748b; }
+    .tag { display: inline-flex; align-items: center; border-radius: 999px; padding: 2px 8px; font-size: 12px; font-weight: 600; margin: 1px; white-space: nowrap; }
+    .tag.blue { background: #dbeafe; color: #1d4ed8; }
+    .tag.green { background: #dcfce7; color: #15803d; }
+    .tag.orange { background: #ffedd5; color: #c2410c; }
+    .tag.red { background: #fee2e2; color: #b91c1c; }
+    .tag.purple { background: #ede9fe; color: #6d28d9; }
+    .tag.gray { background: #e2e8f0; color: #334155; }
+    .progress { width: 96px; height: 7px; background: #e2e8f0; border-radius: 999px; overflow: hidden; margin-top: 4px; }
+    .bar { height: 100%; background: #16a34a; }
+    .ops { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
+    .pager { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; color: #64748b; }
+    .pages { display: flex; gap: 6px; align-items: center; }
+    .page { border: 1px solid #cbd5e1; background: #fff; border-radius: 5px; padding: 4px 8px; cursor: pointer; }
+    .page.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+    .page-size { width: 88px; min-height: 30px; padding: 4px 8px; }
+    .drawer-mask { position: fixed; inset: 0; background: rgba(15,23,42,.36); z-index: 9; display: none; }
+    .drawer { position: fixed; top: 0; right: 0; width: min(860px, 94vw); height: 100vh; background: #fff; z-index: 10; transform: translateX(100%); transition: .22s; display: flex; flex-direction: column; box-shadow: -8px 0 28px rgba(15,23,42,.18); }
+    .drawer.open { transform: translateX(0); }
+    .drawer-mask.show { display: block; }
+    .drawer-head { padding: 16px 18px 12px; border-bottom: 1px solid #e2e8f0; }
+    .head-row { display: flex; justify-content: space-between; gap: 12px; align-items: start; }
+    .drawer h2 { margin: 0 0 8px; font-size: 18px; }
+    .close { border: 1px solid #cbd5e1; background: #fff; border-radius: 6px; padding: 5px 9px; cursor: pointer; }
+    .tabs { display: flex; gap: 4px; padding: 10px 18px 0; border-bottom: 1px solid #e2e8f0; }
+    .tab { border: 0; background: transparent; padding: 10px 12px; border-bottom: 2px solid transparent; cursor: pointer; font-weight: 700; color: #475569; }
+    .tab.active { color: #2563eb; border-bottom-color: #2563eb; }
+    .drawer-body { padding: 16px 18px 24px; overflow: auto; }
+    .tabpage { display: none; }
+    .tabpage.active { display: block; }
+    .split { display: grid; grid-template-columns: 240px 1fr; gap: 14px; }
+    .box { border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; padding: 12px; }
+    .box h3 { margin: 0 0 10px; font-size: 15px; }
+    .mile { display: grid; grid-template-columns: 90px 1fr auto; gap: 10px; padding: 10px 0; border-bottom: 1px solid #f1f5f9; align-items: center; }
+    .calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+    .day { min-height: 46px; border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px; cursor: pointer; background: #fff; }
+    .day.active { border-color: #2563eb; background: #eff6ff; }
+    .day.haslog::after { content: ""; display: block; width: 6px; height: 6px; background: #16a34a; border-radius: 50%; margin-top: 5px; }
+    .editor { min-height: 210px; line-height: 1.7; }
+    .tree div { padding: 6px 0; border-bottom: 1px solid #f1f5f9; }
+    .file-row { display: grid; grid-template-columns: 1fr 90px 110px auto; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid #f1f5f9; }
+    .person { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 10px; padding: 9px 0; border-bottom: 1px solid #f1f5f9; align-items: center; }
+    .toast { position: fixed; right: 18px; bottom: 18px; background: #111827; color: #fff; padding: 10px 14px; border-radius: 6px; opacity: 0; transform: translateY(8px); transition: .2s; z-index: 20; }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    @media (max-width: 1100px) {
+      .toolbar { grid-template-columns: 1fr 1fr; }
+      .summary { grid-template-columns: repeat(2, 1fr); }
+      .tablebox { overflow-x: auto; }
+      table { min-width: 1120px; }
+    }
+    @media (max-width: 720px) {
+      header { padding: 0 12px; }
+      .userbar span { display: none; }
+      main { padding: 12px; }
+      .toolbar, .summary, .split { grid-template-columns: 1fr; }
+      .tabs { overflow-x: auto; }
+      .file-row, .person, .mile { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand"><div class="logo">MP</div><span>事务项目管理系统</span></div>
+    <div class="userbar">
+      <div class="avatar">张</div>
+      <span>张经理</span>
+      <button class="logout" onclick="location.href='auth.html'">退出</button>
+    </div>
+  </header>
+  <main>
+    <section class="toolbar">
+      <div class="wide">
+        <label>全文检索：项目名称 / 日志 / 文档</label>
+        <input class="auto-filter" id="q" placeholder="例如：验收、合同评审、会议纪要、报价单">
+      </div>
+      <div>
+        <label>所属目录关键词</label>
+        <input class="auto-filter" id="folderKeyword" placeholder="例如：重点客户 / 2026实施">
+      </div>
+      <div>
+        <label>项目分类</label>
+        <div class="checks" aria-label="项目分类多选">
+          <label class="check"><input class="auto-filter" type="checkbox" checked>工程</label>
+          <label class="check"><input class="auto-filter" type="checkbox" checked>贸易</label>
+          <label class="check"><input class="auto-filter" type="checkbox">创新</label>
+          <label class="check"><input class="auto-filter" type="checkbox">办公</label>
+        </div>
+      </div>
+      <div>
+        <label>项目状态</label>
+        <div class="checks" aria-label="项目状态多选">
+          <label class="check"><input class="auto-filter" type="checkbox">线索</label>
+          <label class="check"><input class="auto-filter" type="checkbox">售前</label>
+          <label class="check"><input class="auto-filter" type="checkbox" checked>合同</label>
+          <label class="check"><input class="auto-filter" type="checkbox" checked>执行</label>
+          <label class="check"><input class="auto-filter" type="checkbox">紧急</label>
+        </div>
+      </div>
+      <div>
+        <label>启动日期范围</label>
+        <div class="date-range">
+          <input class="auto-filter" type="date" value="2026-03-01" aria-label="启动日期开始">
+          <input class="auto-filter" type="date" value="2026-06-30" aria-label="启动日期结束">
+        </div>
+      </div>
+      <div>
+        <label>最后更新范围</label>
+        <div class="date-range">
+          <input class="auto-filter" type="date" value="2026-06-01" aria-label="最后更新开始">
+          <input class="auto-filter" type="date" value="2026-06-23" aria-label="最后更新结束">
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn secondary" onclick="showToast('筛选条件已重置，列表已刷新')">重置</button>
+      </div>
+    </section>
+
+    <section class="summary">
+      <div class="metric"><span>进行中项目</span><strong>18</strong></div>
+      <div class="metric"><span>今日需跟进</span><strong>6</strong></div>
+      <div class="metric"><span>紧急项目</span><strong>3</strong></div>
+      <div class="metric"><span>本周更新日志</span><strong>24</strong></div>
+    </section>
+
+    <section class="tablebox">
+      <table>
+        <thead>
+          <tr>
+            <th><button class="sort" data-sort="name">项目名称</button></th>
+            <th><button class="sort" data-sort="folder">所属目录</button></th>
+            <th><button class="sort" data-sort="category">分类</button></th>
+            <th><button class="sort" data-sort="start">启动日期</button></th>
+            <th><button class="sort" data-sort="status">项目状态</button></th>
+            <th><button class="sort desc" data-sort="updated">最后更新</button></th>
+            <th><button class="sort" data-sort="next">下一步项目节点</button></th>
+            <th><button class="sort" data-sort="milestone">里程碑</button></th>
+            <th style="text-align:right;">项目操作</th>
+          </tr>
+        </thead>
+        <tbody id="projectRows">
+          <tr data-name="滨海园区弱电改造" data-folder="重点客户/2026实施" data-category="工程实施类" data-start="2026-03-12" data-status="执行 紧急" data-updated="2026-06-23" data-next="2026-06-24" data-milestone="0.64">
+            <td><button class="project-link" onclick="openDrawer('滨海园区弱电改造')">滨海园区弱电改造</button><br><span class="muted">客户侧实施项目</span></td>
+            <td>重点客户/2026实施</td>
+            <td><span class="tag blue">工程实施类</span></td>
+            <td>2026-03-12</td>
+            <td><span class="tag green">执行</span><span class="tag red">紧急</span></td>
+            <td>2026-06-23</td>
+            <td><strong>06-24</strong> 提交施工变更确认单</td>
+            <td>7/11<div class="progress"><div class="bar" style="width:64%"></div></div></td>
+            <td><div class="ops"><button class="btn text" onclick="showToast('项目已冻结')">冻结</button><button class="btn text" onclick="showToast('项目已启动')">启动</button><button class="btn text" onclick="showToast('打开基础信息编辑')">编辑</button><button class="btn text" onclick="confirmDelete()">删除</button></div></td>
+          </tr>
+          <tr data-name="进口备件贸易跟进" data-folder="贸易机会/机电备件" data-category="贸易交易类" data-start="2026-05-06" data-status="合同 售前" data-updated="2026-06-22" data-next="2026-06-25" data-milestone="0.38">
+            <td><button class="project-link" onclick="openDrawer('进口备件贸易跟进')">进口备件贸易跟进</button><br><span class="muted">供应商报价与合同</span></td>
+            <td>贸易机会/机电备件</td>
+            <td><span class="tag orange">贸易交易类</span></td>
+            <td>2026-05-06</td>
+            <td><span class="tag orange">合同</span><span class="tag purple">售前</span></td>
+            <td>2026-06-22</td>
+            <td><strong>06-25</strong> 核对付款条款</td>
+            <td>3/8<div class="progress"><div class="bar" style="width:38%"></div></div></td>
+            <td><div class="ops"><button class="btn text">冻结</button><button class="btn text">启动</button><button class="btn text">编辑</button><button class="btn text" onclick="confirmDelete()">删除</button></div></td>
+          </tr>
+          <tr data-name="AI 办公归档方案" data-folder="创新课题/办公效率" data-category="创新探讨类" data-start="2026-04-18" data-status="线索 执行" data-updated="2026-06-21" data-next="2026-06-26" data-milestone="0.67">
+            <td><button class="project-link" onclick="openDrawer('AI 办公归档方案')">AI 办公归档方案</button><br><span class="muted">内部创新讨论</span></td>
+            <td>创新课题/办公效率</td>
+            <td><span class="tag purple">创新探讨类</span></td>
+            <td>2026-04-18</td>
+            <td><span class="tag blue">线索</span><span class="tag green">执行</span></td>
+            <td>2026-06-21</td>
+            <td><strong>06-26</strong> 完成演示脚本</td>
+            <td>4/6<div class="progress"><div class="bar" style="width:67%"></div></div></td>
+            <td><div class="ops"><button class="btn text">冻结</button><button class="btn text">启动</button><button class="btn text">编辑</button><button class="btn text" onclick="confirmDelete()">删除</button></div></td>
+          </tr>
+          <tr data-name="年度办公室搬迁准备" data-folder="办公事务/行政" data-category="办公事务类" data-start="2026-06-01" data-status="待验收" data-updated="2026-06-20" data-next="2026-06-27" data-milestone="0.56">
+            <td><button class="project-link" onclick="openDrawer('年度办公室搬迁准备')">年度办公室搬迁准备</button><br><span class="muted">行政事务统筹</span></td>
+            <td>办公事务/行政</td>
+            <td><span class="tag gray">办公事务类</span></td>
+            <td>2026-06-01</td>
+            <td><span class="tag orange">待验收</span></td>
+            <td>2026-06-20</td>
+            <td><strong>06-27</strong> 资产清单复核</td>
+            <td>5/9<div class="progress"><div class="bar" style="width:56%"></div></div></td>
+            <td><div class="ops"><button class="btn text">冻结</button><button class="btn text">启动</button><button class="btn text">编辑</button><button class="btn text" onclick="confirmDelete()">删除</button></div></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="pager">
+        <span>共 42 个项目，当前显示 1-10</span>
+        <div class="pages">
+          <button class="page">上一页</button>
+          <button class="page active">1</button>
+          <button class="page">2</button>
+          <button class="page">3</button>
+          <button class="page">下一页</button>
+          <select class="page-size auto-filter" aria-label="每页条数"><option>10 条</option><option>20 条</option><option>50 条</option><option>100 条</option></select>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="mask" class="drawer-mask"></div>
+  <aside id="drawer" class="drawer" aria-label="项目详情面板">
+    <div class="drawer-head">
+      <div class="head-row">
+        <div>
+          <h2 id="drawerTitle">滨海园区弱电改造</h2>
+          <div><span class="tag blue">工程实施类</span><span class="tag green">执行</span><span class="tag red">紧急</span></div>
+        </div>
+        <button class="close" onclick="closeDrawer()">关闭</button>
+      </div>
+      <p class="muted">下一步：06-24 提交施工变更确认单；里程碑 7/11，最近日志更新于 2026-06-23。</p>
+    </div>
+    <nav class="tabs">
+      <button class="tab active" data-tab="milestone">项目里程碑设计</button>
+      <button class="tab" data-tab="log">项目日志</button>
+      <button class="tab" data-tab="doc">项目相关文档</button>
+      <button class="tab" data-tab="people">项目相关人</button>
+    </nav>
+    <div class="drawer-body">
+      <section id="milestone" class="tabpage active">
+        <div class="box">
+          <h3>里程碑进度</h3>
+          <div class="mile"><span>03-12</span><strong>项目启动会</strong><span class="tag green">已完成</span></div>
+          <div class="mile"><span>04-02</span><strong>现场踏勘与清单确认</strong><span class="tag green">已完成</span></div>
+          <div class="mile"><span>05-18</span><strong>主材到场验收</strong><span class="tag green">已完成</span></div>
+          <div class="mile"><span>06-24</span><strong>施工变更确认单</strong><span class="tag red">延期</span></div>
+          <div class="mile"><span>07-05</span><strong>联调测试</strong><span class="tag blue">进行中</span></div>
+          <button class="btn secondary" onclick="showToast('新增里程碑行')">新增里程碑</button>
+        </div>
+      </section>
+      <section id="log" class="tabpage">
+        <div class="split">
+          <div class="box">
+            <h3>2026 年 6 月</h3>
+            <div class="calendar">
+              <div class="day">17</div><div class="day haslog">18</div><div class="day">19</div><div class="day haslog">20</div><div class="day">21</div><div class="day haslog">22</div><div class="day active haslog">23</div>
+            </div>
+            <p class="muted">支持周视图 / 月视图切换，有日志日期显示标记。</p>
+          </div>
+          <div class="box">
+            <h3>06-23 项目日志</h3>
+            <textarea class="editor">上午与客户确认弱电井施工窗口，客户要求把周五夜间施工改到周六上午。已同步施工队重新排班。
+
+待办：
+1. 06-24 前提交施工变更确认单。
+2. 补充材料到场照片到 02.项目过程/现场照片。
+3. 与采购确认备用交换机到货时间。</textarea>
+            <button class="btn" onclick="showToast('日志已自动保存')">保存日志</button>
+          </div>
+        </div>
+      </section>
+      <section id="doc" class="tabpage">
+        <div class="split">
+          <div class="box tree">
+            <h3>文档目录</h3>
+            <div>01.项目启动</div>
+            <div>02.项目过程 / 会议纪要</div>
+            <div>02.项目过程 / 现场照片</div>
+            <div>03.项目完结</div>
+            <button class="btn secondary" onclick="showToast('新增目录')">新建目录</button>
+          </div>
+          <div class="box">
+            <h3>当前目录文件</h3>
+            <div class="file-row"><strong>施工变更确认单.docx</strong><span>86 KB</span><span class="tag orange">索引中</span><button class="btn text">预览</button></div>
+            <div class="file-row"><strong>现场照片-弱电井.jpg</strong><span>2.4 MB</span><span class="tag green">已索引</span><button class="btn text">预览</button></div>
+            <div class="file-row"><strong>联调计划.pdf</strong><span>640 KB</span><span class="tag green">已索引</span><button class="btn text">预览</button></div>
+            <div class="file-row"><strong>资料归档.zip</strong><span>18 MB</span><span class="tag gray">仅下载</span><button class="btn text">下载</button></div>
+            <button class="btn" onclick="showToast('打开上传文件/文件夹入口')">上传文件或文件夹</button>
+          </div>
+        </div>
+      </section>
+      <section id="people" class="tabpage">
+        <div class="box">
+          <h3>相关人</h3>
+          <div class="person"><strong>李工</strong><span>客户信息中心</span><span>技术确认人</span><button class="btn text">编辑</button></div>
+          <div class="person"><strong>周经理</strong><span>施工单位</span><span>现场负责人</span><button class="btn text">编辑</button></div>
+          <div class="person"><strong>王会计</strong><span>客户财务部</span><span>付款资料</span><button class="btn text">编辑</button></div>
+          <button class="btn secondary" onclick="showToast('新增相关人')">新增相关人</button>
+        </div>
+      </section>
+    </div>
+  </aside>
+  <div id="toast" class="toast"></div>
+
+  <script>
+    const drawer = document.getElementById('drawer');
+    const mask = document.getElementById('mask');
+    function openDrawer(title) {
+      document.getElementById('drawerTitle').textContent = title;
+      drawer.classList.add('open');
+      mask.classList.add('show');
+    }
+    function closeDrawer() {
+      drawer.classList.remove('open');
+      mask.classList.remove('show');
+    }
+    mask.addEventListener('click', closeDrawer);
+    document.querySelectorAll('.tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(item => item.classList.remove('active'));
+        document.querySelectorAll('.tabpage').forEach(item => item.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById(btn.dataset.tab).classList.add('active');
+      });
+    });
+    function showToast(text) {
+      const toast = document.getElementById('toast');
+      toast.textContent = text;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 1800);
+    }
+    function confirmDelete() {
+      if (confirm('确定要逻辑删除该项目吗？删除后普通列表不再显示。')) showToast('项目已逻辑删除');
+    }
+    let filterTimer;
+    document.querySelectorAll('.auto-filter').forEach(control => {
+      const eventName = control.type === 'text' || control.id === 'q' || control.id === 'folderKeyword' ? 'input' : 'change';
+      control.addEventListener(eventName, () => {
+        clearTimeout(filterTimer);
+        filterTimer = setTimeout(() => showToast('筛选条件已变化，列表已自动刷新'), 280);
+      });
+    });
+    document.querySelectorAll('.sort').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const key = btn.dataset.sort;
+        const nextDirection = btn.classList.contains('asc') ? 'desc' : 'asc';
+        document.querySelectorAll('.sort').forEach(item => item.classList.remove('asc', 'desc'));
+        btn.classList.add(nextDirection);
+        sortProjectRows(key, nextDirection);
+        showToast(`已按${btn.textContent}${nextDirection === 'asc' ? '升序' : '降序'}排序`);
+      });
+    });
+    function sortProjectRows(key, direction) {
+      const tbody = document.getElementById('projectRows');
+      const rows = Array.from(tbody.querySelectorAll('tr'));
+      rows.sort((a, b) => {
+        const left = normalizeSortValue(a.dataset[key]);
+        const right = normalizeSortValue(b.dataset[key]);
+        if (left < right) return direction === 'asc' ? -1 : 1;
+        if (left > right) return direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+      rows.forEach(row => tbody.appendChild(row));
+    }
+    function normalizeSortValue(value) {
+      if (!value) return '';
+      const numeric = Number(value);
+      if (!Number.isNaN(numeric)) return numeric;
+      return value.toLowerCase();
+    }
+  </script>
+</body>
+</html>
