@@ -1,13 +1,17 @@
-let state = { page: 1, perPage: 10, sort: "updated_at", direction: "desc", appliedFilters: null, project: null, categories: [], statuses: [], logDate: new Date().toISOString().slice(0, 10), logMonth: new Date(), logSnapshot: null, sourceMode: false, copiedFormat: null, selectedDirId: "root", expandedDirs: new Set(["root"]), metricsCollapsed: false, filtersCollapsed: false, selectedCategories: new Set(), selectedStatuses: new Set() };
+let state = { mode: "project", page: 1, perPage: 10, sort: "updated_at", direction: "desc", appliedFilters: null, project: null, categories: [], statuses: [], userOptions: [], logDate: new Date().toISOString().slice(0, 10), logMonth: new Date(), logSnapshot: null, sourceMode: false, copiedFormat: null, selectedDirId: "root", expandedDirs: new Set(["root"]), metricsCollapsed: false, filtersCollapsed: false, selectedCategories: new Set(), selectedStatuses: new Set() };
 
 async function boot() {
   const me = await api("/api/me");
+  state.me = me.user;
   document.getElementById("meName").textContent = me.user?.nickname || "";
   applySavedPerPage();
   state.categories = (await api("/api/categories")).items;
   state.statuses = (await api("/api/statuses")).items;
+  state.userOptions = (await api("/api/users/options")).items;
   initMultiSelect("category", state.categories);
   initMultiSelect("status", state.statuses);
+  bindModeNav();
+  applyModeText();
   state.appliedFilters = collectFilters();
   document.getElementById("perPage").addEventListener("change", async event => {
     savePerPage(event.target.value);
@@ -17,6 +21,44 @@ async function boot() {
   });
   bindCollapseHandlers();
   await loadProjects();
+}
+
+function term() {
+  return state.mode === "personal" ? "事务" : "项目";
+}
+
+function phrase(text) {
+  return state.mode === "personal" ? text.replaceAll("项目", "事务") : text;
+}
+
+function bindModeNav() {
+  document.querySelectorAll("[data-mode]").forEach(btn => btn.addEventListener("click", async () => {
+    const nextMode = btn.dataset.mode;
+    if (state.mode === nextMode) return;
+    state.mode = nextMode;
+    state.page = 1;
+    state.appliedFilters = collectFilters();
+    document.querySelectorAll("[data-mode]").forEach(item => item.classList.toggle("active", item.dataset.mode === state.mode));
+    applyModeText();
+    await loadProjects();
+  }));
+}
+
+function applyModeText() {
+  const word = term();
+  document.title = `${word}工作台 - 事务项目管理系统`;
+  document.getElementById("metricTotalLabel").textContent = `${word}总数`;
+  document.getElementById("categoryFilterLabel").textContent = `${word}分类`;
+  document.getElementById("statusFilterLabel").textContent = `${word}状态`;
+  document.getElementById("q").placeholder = `${word}名称 / 日志 / 文档`;
+  document.getElementById("newProjectBtn").textContent = `新建${word}`;
+  document.getElementById("nameSortBtn").firstChild.textContent = `${word}名称`;
+  document.getElementById("statusTh").textContent = `${word}状态`;
+  document.getElementById("nextNodeSortBtn").firstChild.textContent = `下一步${word}节点`;
+  document.getElementById("milestonesTabBtn").textContent = `${word}里程碑设计`;
+  document.getElementById("logsTabBtn").textContent = `${word}日志`;
+  document.getElementById("documentsTabBtn").textContent = `${word}相关文档`;
+  document.getElementById("peopleTabBtn").textContent = `${word}相关人`;
 }
 
 function initMultiSelect(type, items) {
@@ -124,7 +166,7 @@ function updateMetricsSummary() {
   if (!state.metricsCollapsed) { el.textContent = ""; return; }
   const total = document.getElementById("metricTotal").textContent;
   const filtered = document.getElementById("metricFiltered").textContent;
-  el.innerHTML = `共 <strong>${total}</strong> 个项目，已筛选 <strong>${filtered}</strong> 个`;
+  el.innerHTML = `共 <strong>${total}</strong> 个${term()}，已筛选 <strong>${filtered}</strong> 个`;
 }
 
 function updateFiltersSummary() {
@@ -139,12 +181,12 @@ function updateFiltersSummary() {
   const cats = Array.from(state.selectedCategories);
   if (cats.length) {
     const names = cats.map(id => state.categories.find(c => String(c.id) === String(id))?.name || id);
-    chips.push(`分类: ${names.join(", ")}`);
+    chips.push(`${term()}分类: ${names.join(", ")}`);
   }
   const stats = Array.from(state.selectedStatuses);
   if (stats.length) {
     const names = stats.map(id => state.statuses.find(s => String(s.id) === String(id))?.name || id);
-    chips.push(`状态: ${names.join(", ")}`);
+    chips.push(`${term()}状态: ${names.join(", ")}`);
   }
   const startFrom = document.getElementById("startFrom").value;
   const startTo = document.getElementById("startTo").value;
@@ -158,6 +200,7 @@ function updateFiltersSummary() {
 
 function collectFilters() {
   const params = new URLSearchParams({
+    item_type: state.mode === "personal" ? "personal" : "project",
     page: state.page,
     per_page: document.getElementById("perPage").value,
     sort: state.sort,
@@ -187,7 +230,7 @@ async function loadProjects() {
   document.getElementById("metricFiltered").textContent = data.total;
   document.getElementById("metricPage").textContent = data.page;
   renderCategoryAmountStats(data.category_amounts || []);
-  document.getElementById("pageInfo").textContent = `共 ${data.total} 个项目，当前第 ${data.page} 页`;
+  document.getElementById("pageInfo").textContent = `共 ${data.total} 个${term()}，当前第 ${data.page} 页`;
   updatePager(data);
   updateMetricsSummary();
   updateFiltersSummary();
@@ -229,6 +272,7 @@ function projectRow(p) {
     <td class="right"><div class="ops">
       ${p.is_frozen ? `<button class="text-btn" data-state="${p.id}:start">启动</button>` : `<button class="text-btn" data-state="${p.id}:freeze">冻结</button>`}
       <button class="text-btn" data-edit="${p.id}">编辑</button>
+      <button class="text-btn" data-audit="${p.id}">logs</button>
       <button class="text-btn" data-state="${p.id}:delete">删除</button>
     </div></td>
   </tr>`;
@@ -239,6 +283,32 @@ function amountBlock(p) {
     <span class="amount-contract">${formatMoney(p.contract_amount)}</span>
     <span class="amount-invoice">${formatMoney(p.invoiced_amount)}</span>
     <span class="amount-receive">${formatMoney(p.received_amount)}</span>
+  </div>`;
+}
+
+async function openAuditLogs(projectId) {
+  const data = await api(`/api/projects/${projectId}/audit-logs`);
+  const items = data.items || [];
+  openModal(`<h2>${term()} logs</h2>
+    <div class="audit-list">
+      ${items.length ? items.map(auditItem).join("") : `<div class="muted">暂无操作记录</div>`}
+    </div>
+    <div class="modal-actions"><button type="button" class="secondary" data-close-modal>关闭</button></div>`);
+}
+
+function auditItem(item) {
+  let details = item.details || "";
+  try {
+    const parsed = JSON.parse(details);
+    details = JSON.stringify(parsed, null, 2);
+  } catch (err) {
+    details = details || "";
+  }
+  const actor = item.nickname || item.email || "系统";
+  return `<div class="audit-item">
+    <div><strong>${esc(item.action)}</strong> <span class="muted">${esc(item.created_at || "")}</span></div>
+    <div class="muted">操作人：${esc(actor)}${item.ip ? ` / ${esc(item.ip)}` : ""}</div>
+    ${details ? `<pre>${esc(details)}</pre>` : ""}
   </div>`;
 }
 
@@ -285,10 +355,12 @@ document.addEventListener("click", async event => {
   if (openId) openProject(openId);
   const editId = event.target.dataset.edit;
   if (editId) openProjectForm(editId);
+  const auditId = event.target.dataset.audit;
+  if (auditId) openAuditLogs(auditId);
   const stateAction = event.target.dataset.state;
   if (stateAction) {
     const [id, action] = stateAction.split(":");
-    if (action === "delete" && !confirm("确定要逻辑删除该项目吗？")) return;
+    if (action === "delete" && !confirm(`确定要逻辑删除该${term()}吗？`)) return;
     await api(`/api/projects/${id}/state`, { method: "POST", body: { action } });
     toast("操作成功");
     loadProjects();
@@ -384,9 +456,16 @@ function switchTab(tab) {
 async function openProjectForm(id) {
   const p = id ? (await api(`/api/projects/${id}`)).project : {};
   const milestones = id ? (await api(`/api/projects/${id}/milestones`)).items : [];
-  openModal(`<h2>${id ? "编辑项目" : "新建项目"}</h2>
+  const word = term();
+  const selectedMemberIds = new Set((p.members || []).map(m => String(m.id)));
+  const memberBlock = state.mode === "project" ? `<label class="full">项目成员
+        <select name="member_ids" multiple class="member-list">
+          ${state.userOptions.map(u => `<option value="${u.id}" ${selectedMemberIds.has(String(u.id)) || (!id && String(u.id) === String(state.me?.id || "")) ? "selected" : ""}>${esc(u.nickname)} / ${esc(u.email)}</option>`).join("")}
+        </select>
+      </label>` : "";
+  openModal(`<h2>${id ? `编辑${word}` : `新建${word}`}</h2>
     <form id="projectForm" class="form-grid">
-      <label>项目名称<input name="name" value="${esc(p.name || "")}" required></label>
+      <label>${word}名称<input name="name" value="${esc(p.name || "")}" required></label>
       <label>所属目录<input name="folder" value="${esc(p.folder || "")}" required></label>
       <label>分类<select name="category_id">${state.categories.map(c => `<option value="${c.id}" ${p.category_id == c.id ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select></label>
       <label>状态<select name="status_ids" multiple>${state.statuses.map(s => `<option value="${s.id}" ${(p.statuses || []).some(x => x.id === s.id) ? "selected" : ""}>${esc(s.name)}</option>`).join("")}</select></label>
@@ -396,13 +475,16 @@ async function openProjectForm(id) {
       <label>已回款金额<input name="received_amount" type="number" min="0" step="0.01" value="${esc(p.received_amount ?? 0)}"></label>
       <label>下一步节点<select name="next_milestone_id"><option value="">无</option>${milestones.map(m => `<option value="${m.id}" data-name="${esc(m.name || "")}" data-date="${esc(m.plan_date || "")}" ${p.next_node === m.name ? "selected" : ""}>${esc(m.plan_date || "")} ${esc(m.name || "")}</option>`).join("")}</select></label>
       <label class="full">说明<textarea name="description">${esc(p.description || "")}</textarea></label>
+      ${memberBlock}
       <div class="modal-actions full"><button type="button" class="secondary" data-close-modal>取消</button><button class="primary">保存</button></div>
     </form>`);
   document.getElementById("projectForm").addEventListener("submit", async event => {
     event.preventDefault();
     const fd = new FormData(event.target);
     const body = Object.fromEntries(fd);
+    body.item_type = state.mode;
     body.status_ids = Array.from(event.target.elements.status_ids.selectedOptions).map(o => o.value);
+    body.member_ids = event.target.elements.member_ids ? Array.from(event.target.elements.member_ids.selectedOptions).map(o => o.value) : [];
     const nextOption = event.target.elements.next_milestone_id.selectedOptions[0];
     body.next_node = nextOption?.dataset.name || "";
     body.next_node_date = nextOption?.dataset.date || "";
@@ -410,7 +492,7 @@ async function openProjectForm(id) {
     await api(id ? `/api/projects/${id}` : "/api/projects", { method: id ? "PUT" : "POST", body });
     closeModal();
     await loadProjects();
-    toast("项目已保存");
+    toast(`${word}已保存`);
   });
 }
 
@@ -500,6 +582,7 @@ async function saveMilestoneOrder() {
 
 async function loadLogs() {
   state.sourceMode = false;
+  const word = term();
   const logs = await api(`/api/projects/${state.project.id}/logs`);
   const logMap = Object.fromEntries(logs.items.map(item => [item.log_date, item]));
   const dayData = await api(`/api/projects/${state.project.id}/logs?date=${state.logDate}`);
@@ -522,7 +605,7 @@ async function loadLogs() {
       </div>
     </aside>
     <section class="log-main">
-      <h3>${esc(state.logDate)} 项目日志</h3>
+      <h3>${esc(state.logDate)} ${word}日志</h3>
       <form id="logForm">
         <input name="title" id="logTitle" placeholder="日志标题" value="${esc(dayData.item?.title || "")}">
         <div class="editor-toolbar">
@@ -616,7 +699,7 @@ function bindLogEvents() {
     markLogDirty();
     await loadProjects();
     await loadLogs();
-    toast("日志已保存");
+    toast(`${word}日志已保存`);
   });
   let searchTimer;
   document.getElementById("logSearchInput").addEventListener("input", event => {
@@ -717,6 +800,7 @@ function cleanPlainText(html) {
 }
 
 async function loadDocuments() {
+  const word = term();
   const dirs = await api(`/api/projects/${state.project.id}/dirs`);
   if (!state.selectedDirId) state.selectedDirId = "root";
   if (state.selectedDirId !== "root" && dirs.items.length && !dirs.items.some(d => String(d.id) === String(state.selectedDirId))) state.selectedDirId = "root";
@@ -860,13 +944,13 @@ function openDocPreview(docId, name, type) {
 
 async function loadPeople() {
   const data = await api(`/api/projects/${state.project.id}/people`);
-  document.getElementById("tab-people").innerHTML = `<div class="box"><h3>相关人</h3>
+  document.getElementById("tab-people").innerHTML = `<div class="box"><h3>${term()}相关人</h3>
     ${data.items.map(p => `<form class="person-row" data-person-row="${p.id}"><input name="name" value="${esc(p.name || "")}" placeholder="姓名"><input name="organization" value="${esc(p.organization || "")}" placeholder="单位职务"><input name="note" value="${esc(p.note || "")}" placeholder="备注"><div class="ops"><button type="button" class="text-btn" data-save-person="${p.id}">保存</button><button type="button" class="text-btn" data-del-person="${p.id}">删除</button></div></form>`).join("")}
     <form id="personForm" class="person-form"><input name="name" placeholder="姓名" required><input name="organization" placeholder="单位职务"><input name="note" placeholder="备注"><button class="primary">新增相关人</button></form></div>`;
   document.querySelectorAll("[data-save-person]").forEach(btn => btn.addEventListener("click", async () => {
     const form = btn.closest(".person-row");
     await api(`/api/people/${btn.dataset.savePerson}`, { method: "PUT", body: Object.fromEntries(new FormData(form)) });
-    toast("相关人已保存");
+    toast(`${term()}相关人已保存`);
     await loadPeople();
   }));
   document.querySelectorAll("[data-del-person]").forEach(btn => btn.addEventListener("click", async () => {

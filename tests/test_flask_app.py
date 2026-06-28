@@ -68,6 +68,49 @@ class FlaskAppTests(unittest.TestCase):
         self.assertGreaterEqual(created_category["invoiced_amount"], 50000)
         self.assertGreaterEqual(created_category["received_amount"], 30000)
 
+    def test_personal_items_are_separated_from_projects(self):
+        self.login()
+        categories = self.client.get("/api/categories").get_json()["items"]
+        res = self.client.post(
+            "/api/projects",
+            json={"item_type": "personal", "name": "个人事务测试", "folder": "个人/测试", "category_id": categories[0]["id"]},
+        )
+        self.assertEqual(res.status_code, 200)
+        projects = self.client.get("/api/projects?item_type=project").get_json()
+        personal = self.client.get("/api/projects?item_type=personal").get_json()
+        self.assertFalse(any(item["name"] == "个人事务测试" for item in projects["items"]))
+        self.assertTrue(any(item["name"] == "个人事务测试" for item in personal["items"]))
+        item_id = res.get_json()["id"]
+        log_res = self.client.post(f"/api/projects/{item_id}/logs", json={"log_date": "2026-06-25", "content": "事务日志内容"})
+        self.assertEqual(log_res.status_code, 200)
+        log_item = self.client.get(f"/api/projects/{item_id}/logs?date=2026-06-25").get_json()["item"]
+        self.assertIn("事务日志", log_item["title"])
+
+    def test_project_members_and_audit_logs(self):
+        self.login("admin", "Ad123654")
+        create_user = self.client.post("/api/admin/users", json={"email": "member@example.com", "nickname": "成员", "password": "password", "status": "active"})
+        self.assertEqual(create_user.status_code, 200)
+        self.client.post("/api/auth/logout")
+
+        self.login()
+        categories = self.client.get("/api/categories").get_json()["items"]
+        users = self.client.get("/api/users/options").get_json()["items"]
+        member = next(item for item in users if item["email"] == "member@example.com")
+        res = self.client.post(
+            "/api/projects",
+            json={"name": "协作项目测试", "folder": "协作/测试", "category_id": categories[0]["id"], "member_ids": [member["id"]]},
+        )
+        self.assertEqual(res.status_code, 200)
+        project_id = res.get_json()["id"]
+        audit = self.client.get(f"/api/projects/{project_id}/audit-logs")
+        self.assertEqual(audit.status_code, 200)
+        self.assertTrue(any(item["action"] == "create" for item in audit.get_json()["items"]))
+
+        self.client.post("/api/auth/logout")
+        self.login("member@example.com", "password")
+        visible = self.client.get("/api/projects?item_type=project").get_json()
+        self.assertTrue(any(item["id"] == project_id for item in visible["items"]))
+
     def test_admin_usage(self):
         res = self.login("admin", "Ad123654")
         self.assertEqual(res.status_code, 200)

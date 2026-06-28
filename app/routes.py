@@ -62,6 +62,14 @@ def money_value(value):
         return 0
 
 
+def current_item_type():
+    return "personal" if request.args.get("item_type") == "personal" else "project"
+
+
+def payload_item_type(data):
+    return "personal" if data.get("item_type") == "personal" else "project"
+
+
 def make_code(length=6):
     alphabet = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
     return "".join(secrets.choice(alphabet) for _ in range(length))
@@ -95,14 +103,52 @@ def send_mail(to_email, subject, content):
 def project_allowed(project_id, user):
     if user["role"] == "admin":
         return query_one("select * from projects where id=? and is_deleted=0", (project_id,))
-    return query_one("select * from projects where id=? and user_id=? and is_deleted=0", (project_id, user["id"]))
-
-
-def audit(actor_id, object_type, object_id, action):
-    execute(
-        "insert into audit_logs(actor_id,object_type,object_id,action,ip,created_at) values(?,?,?,?,?,?)",
-        (actor_id, object_type, object_id, action, request.remote_addr or "", now()),
+    return query_one(
+        """select p.* from projects p
+           where p.id=? and p.is_deleted=0 and (
+             p.user_id=?
+             or (p.item_type='project' and exists(
+               select 1 from project_members pm where pm.project_id=p.id and pm.user_id=? and pm.can_edit=1
+             ))
+           )""",
+        (project_id, user["id"], user["id"]),
     )
+
+
+def audit(actor_id, object_type, object_id, action, details=None):
+    execute(
+        "insert into audit_logs(actor_id,object_type,object_id,action,details,ip,created_at) values(?,?,?,?,?,?,?)",
+        (actor_id, object_type, object_id, action, json.dumps(details, ensure_ascii=False) if isinstance(details, (dict, list)) else details, request.remote_addr or "", now()),
+    )
+
+
+def audit_project(user, project_id, action, details=None):
+    audit(user["id"], "project", project_id, action, details)
+
+
+def project_members(project_id):
+    return query_all(
+        """select u.id,u.email,u.nickname,pm.can_edit,pm.created_at
+           from project_members pm join users u on u.id=pm.user_id
+           where pm.project_id=? order by u.id""",
+        (project_id,),
+    )
+
+
+def sync_project_members(conn, project_id, owner_id, member_ids):
+    allowed = {owner_id}
+    allowed.update(int(mid) for mid in member_ids if str(mid).isdigit())
+    valid = {
+        row["id"]
+        for row in conn.execute(
+            "select id from users where role<>'admin' and status='active' and id in ({})".format(",".join("?" for _ in allowed)),
+            tuple(allowed),
+        ).fetchall()
+    } if allowed else set()
+    valid.add(owner_id)
+    conn.execute("delete from project_members where project_id=?", (project_id,))
+    for uid in sorted(valid):
+        conn.execute("insert or ignore into project_members(project_id,user_id,can_edit,created_at) values(?,?,1,?)", (project_id, uid, now()))
 
 
 @bp.get("/")
@@ -261,6 +307,15 @@ def safe_user(user):
     return {k: user[k] for k in ["id", "email", "nickname", "avatar", "role", "status", "last_login_at"] if k in user.keys()}
 
 
+@bp.get("/api/users/options")
+def user_options():
+    user, err = require_user()
+    if err:
+        return err
+    rows = query_all("select id,email,nickname from users where role<>'admin' and status='active' order by nickname,email")
+    return jsonify({"items": rows})
+
+
 @bp.get("/api/categories")
 def categories():
     user, err = require_user()
@@ -349,8 +404,16 @@ def build_project_query(user, args):
         "milestone": "milestone_done * 1.0 / nullif(milestone_total,0)",
         "amounts": "p.received_amount",
     }
-    params = [user["id"]]
-    where = ["p.user_id=?", "p.is_deleted=0"]
+    item_type = "personal" if args.get("item_type") == "personal" else "project"
+    params = [item_type]
+    where = ["p.item_type=?", "p.is_deleted=0"]
+    if user["role"] != "admin":
+        if item_type == "personal":
+            where.append("p.user_id=?")
+            params.append(user["id"])
+        else:
+            where.append("(p.user_id=? or exists(select 1 from project_members pm where pm.project_id=p.id and pm.user_id=? and pm.can_edit=1))")
+            params.extend([user["id"], user["id"]])
     if args.get("folder"):
         where.append("p.folder like ?")
         params.append(f"%{args['folder']}%")
@@ -443,15 +506,17 @@ def create_project():
     data = payload()
     name = clean_text(data.get("name"))
     folder = clean_text(data.get("folder"))
+    item_type = payload_item_type(data)
     if not name or not folder:
         return jsonify({"error": "项目名称和所属目录必填"}), 400
     with connect() as conn:
         pid = conn.execute(
-            """insert into projects(user_id,name,folder,category_id,start_date,next_node_date,next_node,description,
+            """insert into projects(user_id,item_type,name,folder,category_id,start_date,next_node_date,next_node,description,
                contract_amount,invoiced_amount,received_amount,is_frozen,is_deleted,created_at,updated_at)
-               values(?,?,?,?,?,?,?,?,?,?,?,0,0,?,?)""",
+               values(?,?,?,?,?,?,?,?,?,?,?,?,0,0,?,?)""",
             (
                 user["id"],
+                item_type,
                 name,
                 folder,
                 data.get("category_id"),
@@ -468,9 +533,13 @@ def create_project():
         ).lastrowid
         for sid in data.get("status_ids", []) if isinstance(data.get("status_ids"), list) else request.form.getlist("status_ids"):
             conn.execute("insert or ignore into project_statuses(project_id,status_id) values(?,?)", (pid, sid))
-        for idx, dirname in enumerate(["01.项目启动", "02.项目过程", "03.项目完结"]):
+        if item_type == "project":
+            member_ids = data.get("member_ids", []) if isinstance(data.get("member_ids"), list) else request.form.getlist("member_ids")
+            sync_project_members(conn, pid, user["id"], member_ids)
+        default_dirs = ["01.事务启动", "02.事务过程", "03.事务完结"] if item_type == "personal" else ["01.项目启动", "02.项目过程", "03.项目完结"]
+        for idx, dirname in enumerate(default_dirs):
             conn.execute("insert into document_dirs(project_id,parent_id,name,sort_order,deleted) values(?,null,?,?,0)", (pid, dirname, idx))
-    audit(user["id"], "project", pid, "create")
+    audit_project(user, pid, "create", {"name": name, "item_type": item_type})
     return jsonify({"id": pid})
 
 
@@ -483,6 +552,7 @@ def get_project(project_id):
     if not project:
         return jsonify({"error": "项目不存在"}), 404
     project["statuses"] = project_status_list(project_id)
+    project["members"] = project_members(project_id) if project.get("item_type") == "project" else []
     return jsonify({"project": project})
 
 
@@ -518,7 +588,10 @@ def update_project(project_id):
         status_ids = data.get("status_ids", []) if isinstance(data.get("status_ids"), list) else request.form.getlist("status_ids")
         for sid in status_ids:
             conn.execute("insert or ignore into project_statuses(project_id,status_id) values(?,?)", (project_id, sid))
-    audit(user["id"], "project", project_id, "update")
+        if project.get("item_type") == "project":
+            member_ids = data.get("member_ids", []) if isinstance(data.get("member_ids"), list) else request.form.getlist("member_ids")
+            sync_project_members(conn, project_id, project["user_id"], member_ids)
+    audit_project(user, project_id, "update", {"name": data.get("name"), "item_type": project.get("item_type")})
     return jsonify({"message": "已保存"})
 
 
@@ -539,8 +612,26 @@ def update_project_state(project_id):
         execute("update projects set is_deleted=1,updated_at=? where id=?", (now(), project_id))
     else:
         return jsonify({"error": "未知操作"}), 400
-    audit(user["id"], "project", project_id, action)
+    audit_project(user, project_id, action)
     return jsonify({"message": "操作成功"})
+
+
+@bp.get("/api/projects/<int:project_id>/audit-logs")
+def project_audit_logs(project_id):
+    user, err = require_user()
+    if err:
+        return err
+    project = project_allowed(project_id, user)
+    if not project:
+        return jsonify({"error": "项目不存在"}), 404
+    rows = query_all(
+        """select a.*,u.nickname,u.email
+           from audit_logs a left join users u on u.id=a.actor_id
+           where a.object_type='project' and a.object_id=?
+           order by a.created_at desc,a.id desc limit 200""",
+        (project_id,),
+    )
+    return jsonify({"items": rows})
 
 
 @bp.route("/api/projects/<int:project_id>/milestones", methods=["GET", "POST"])
@@ -548,7 +639,8 @@ def milestones(project_id):
     user, err = require_user()
     if err:
         return err
-    if not project_allowed(project_id, user):
+    project = project_allowed(project_id, user)
+    if not project:
         return jsonify({"error": "项目不存在"}), 404
     if request.method == "GET":
         return jsonify({"items": query_all("select * from milestones where project_id=? order by sort_order,id", (project_id,))})
@@ -557,6 +649,7 @@ def milestones(project_id):
         "insert into milestones(project_id,name,plan_date,completed_date,status,owner,note,sort_order,created_at,updated_at) values(?,?,?,?,?,?,?,?,?,?)",
         (project_id, data.get("name"), data.get("plan_date"), data.get("completed_date"), data.get("status") or "未开始", data.get("owner"), data.get("note"), int(data.get("sort_order") or 0), now(), now()),
     )
+    audit_project(user, project_id, "milestone_create", {"milestone_id": mid, "name": data.get("name")})
     return jsonify({"id": mid})
 
 
@@ -573,6 +666,7 @@ def update_milestone(item_id):
         "update milestones set name=?,plan_date=?,completed_date=?,status=?,owner=?,note=?,sort_order=?,updated_at=? where id=?",
         (data.get("name"), data.get("plan_date"), data.get("completed_date"), data.get("status"), data.get("owner"), data.get("note"), int(data.get("sort_order") or 0), now(), item_id),
     )
+    audit_project(user, item["project_id"], "milestone_update", {"milestone_id": item_id, "name": data.get("name")})
     return jsonify({"message": "已保存"})
 
 
@@ -595,6 +689,7 @@ def reorder_milestones(project_id):
         for index, item_id in enumerate(ordered_ids):
             conn.execute("update milestones set sort_order=?,updated_at=? where id=?", (index, now(), item_id))
         conn.execute("update projects set updated_at=? where id=?", (now(), project_id))
+    audit_project(user, project_id, "milestone_reorder", {"item_ids": ordered_ids})
     return jsonify({"message": "排序已保存"})
 
 
@@ -607,6 +702,7 @@ def delete_milestone(item_id):
     if not item or not project_allowed(item["project_id"], user):
         return jsonify({"error": "里程碑不存在"}), 404
     execute("delete from milestones where id=?", (item_id,))
+    audit_project(user, item["project_id"], "milestone_delete", {"milestone_id": item_id, "name": item.get("name")})
     return jsonify({"message": "已删除"})
 
 
@@ -615,7 +711,8 @@ def project_logs(project_id):
     user, err = require_user()
     if err:
         return err
-    if not project_allowed(project_id, user):
+    project = project_allowed(project_id, user)
+    if not project:
         return jsonify({"error": "项目不存在"}), 404
     if request.method == "GET":
         date = request.args.get("date")
@@ -642,9 +739,10 @@ def project_logs(project_id):
         conn.execute(
             """insert into project_logs(project_id,log_date,title,content,plain_text,updated_at) values(?,?,?,?,?,?)
                on conflict(project_id,log_date) do update set title=excluded.title,content=excluded.content,plain_text=excluded.plain_text,updated_at=excluded.updated_at""",
-            (project_id, log_date, data.get("title") or f"{log_date} 项目日志", content, plain, now()),
+            (project_id, log_date, data.get("title") or f"{log_date} {'事务' if project.get('item_type') == 'personal' else '项目'}日志", content, plain, now()),
         )
         conn.execute("update projects set updated_at=? where id=?", (now(), project_id))
+    audit_project(user, project_id, "log_save", {"log_date": log_date, "title": data.get("title")})
     return jsonify({"message": "日志已保存"})
 
 
@@ -662,6 +760,7 @@ def dirs(project_id):
         "insert into document_dirs(project_id,parent_id,name,sort_order,deleted) values(?,?,?,?,0)",
         (project_id, data.get("parent_id"), data.get("name"), int(data.get("sort_order") or 0)),
     )
+    audit_project(user, project_id, "dir_create", {"dir_id": did, "name": data.get("name")})
     return jsonify({"id": did})
 
 
@@ -703,6 +802,7 @@ def documents(project_id):
             (project_id, normalize_dir_id(request.form.get("dir_id")), original, stored, suffix, path.stat().st_size, str(path), request.form.get("description"), "已索引" if extracted else "待处理", extracted, now(), now()),
         )
         saved.append({"id": doc_id, "name": original})
+    audit_project(user, project_id, "document_upload", {"files": saved})
     return jsonify({"items": saved})
 
 
@@ -728,6 +828,7 @@ def update_dir(dir_id):
         "update document_dirs set name=?,parent_id=?,sort_order=? where id=?",
         (data.get("name") or item["name"], parent_id, int(data.get("sort_order") or item["sort_order"] or 0), dir_id),
     )
+    audit_project(user, item["project_id"], "dir_update", {"dir_id": dir_id, "name": data.get("name") or item["name"]})
     return jsonify({"message": "目录已保存"})
 
 
@@ -745,6 +846,7 @@ def delete_dir(dir_id):
             conn.execute("update document_dirs set deleted=1 where id=?", (item_id,))
             conn.execute("update documents set deleted=1,updated_at=? where dir_id=?", (now(), item_id))
         conn.execute("update projects set updated_at=? where id=?", (now(), item["project_id"]))
+    audit_project(user, item["project_id"], "dir_delete", {"dir_id": dir_id, "name": item.get("name")})
     return jsonify({"message": "目录已删除"})
 
 
@@ -787,6 +889,7 @@ def update_document(doc_id, project_id=None):
         if not target:
             return jsonify({"error": "目标目录不存在"}), 400
     execute("update documents set dir_id=?,updated_at=? where id=?", (dir_id, now(), doc_id))
+    audit_project(user, doc["project_id"], "document_move", {"document_id": doc_id, "name": doc.get("original_name"), "dir_id": dir_id})
     return jsonify({"message": "文件已移动"})
 
 
@@ -805,6 +908,7 @@ def delete_document(doc_id):
     if not doc or not project_allowed(doc["project_id"], user):
         return jsonify({"error": "文件不存在"}), 404
     execute("update documents set deleted=1,updated_at=? where id=?", (now(), doc_id))
+    audit_project(user, doc["project_id"], "document_delete", {"document_id": doc_id, "name": doc.get("original_name")})
     return jsonify({"message": "已删除"})
 
 
@@ -822,6 +926,7 @@ def people(project_id):
         "insert into people(project_id,name,organization,role,phone,email,wechat,note,created_at,updated_at) values(?,?,?,?,?,?,?,?,?,?)",
         (project_id, data.get("name"), data.get("organization"), data.get("role"), data.get("phone"), data.get("email"), data.get("wechat"), data.get("note"), now(), now()),
     )
+    audit_project(user, project_id, "person_create", {"person_id": pid, "name": data.get("name")})
     return jsonify({"id": pid})
 
 
@@ -838,6 +943,7 @@ def update_person(item_id):
         "update people set name=?,organization=?,role=?,phone=?,email=?,wechat=?,note=?,updated_at=? where id=?",
         (data.get("name"), data.get("organization"), data.get("role"), data.get("phone"), data.get("email"), data.get("wechat"), data.get("note"), now(), item_id),
     )
+    audit_project(user, item["project_id"], "person_update", {"person_id": item_id, "name": data.get("name")})
     return jsonify({"message": "已保存"})
 
 
@@ -850,6 +956,7 @@ def delete_person(item_id):
     if not item or not project_allowed(item["project_id"], user):
         return jsonify({"error": "相关人不存在"}), 404
     execute("delete from people where id=?", (item_id,))
+    audit_project(user, item["project_id"], "person_delete", {"person_id": item_id, "name": item.get("name")})
     return jsonify({"message": "已删除"})
 
 

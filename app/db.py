@@ -40,10 +40,24 @@ def migrate_schema(conn):
         "contract_amount": "real not null default 0",
         "invoiced_amount": "real not null default 0",
         "received_amount": "real not null default 0",
+        "item_type": "text not null default 'project'",
     }
     for name, definition in amount_columns.items():
         if name not in project_columns:
             conn.execute(f"alter table projects add column {name} {definition}")
+    audit_columns = {row["name"] for row in conn.execute("PRAGMA table_info(audit_logs)").fetchall()}
+    if "details" not in audit_columns:
+        conn.execute("alter table audit_logs add column details text")
+    conn.execute(
+        """create table if not exists project_members (
+          project_id integer not null references projects(id) on delete cascade,
+          user_id integer not null references users(id),
+          can_edit integer not null default 1,
+          created_at text not null,
+          primary key(project_id,user_id)
+        )"""
+    )
+    conn.execute("insert or ignore into project_members(project_id,user_id,can_edit,created_at) select id,user_id,1,created_at from projects where item_type='project'")
 
 
 @contextmanager
@@ -177,6 +191,7 @@ def seed_user_workspace(conn, user_id):
                values(?,?,?,?,?,?,?,?,?,?,?,0,0,?,?)""",
             (user_id, name, folder, cat_ids[cat], start, next_date, next_node, "初始化示例项目", contract_amount, invoiced_amount, received_amount, now(), now()),
         ).lastrowid
+        conn.execute("insert or ignore into project_members(project_id,user_id,can_edit,created_at) values(?,?,1,?)", (pid, user_id, now()))
         for st in sts:
             conn.execute("insert into project_statuses(project_id,status_id) values(?,?)", (pid, status_ids[st]))
         create_default_project_children(conn, pid)
@@ -294,6 +309,7 @@ create table if not exists statuses (
 create table if not exists projects (
   id integer primary key autoincrement,
   user_id integer not null references users(id),
+  item_type text not null default 'project',
   name text not null,
   folder text not null,
   category_id integer references categories(id),
@@ -313,6 +329,13 @@ create table if not exists project_statuses (
   project_id integer not null references projects(id) on delete cascade,
   status_id integer not null references statuses(id),
   primary key(project_id,status_id)
+);
+create table if not exists project_members (
+  project_id integer not null references projects(id) on delete cascade,
+  user_id integer not null references users(id),
+  can_edit integer not null default 1,
+  created_at text not null,
+  primary key(project_id,user_id)
 );
 create table if not exists milestones (
   id integer primary key autoincrement,
@@ -388,6 +411,7 @@ create table if not exists audit_logs (
   object_type text,
   object_id integer,
   action text not null,
+  details text,
   ip text,
   created_at text not null
 );

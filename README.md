@@ -50,6 +50,23 @@ python run.py
 - 普通用户：http://127.0.0.1:5500/app
 - 管理后台：http://127.0.0.1:5500/admin
 
+## Docker 启动
+
+使用 `run.sh` 构建并启动容器，默认会把当前项目的 `data` 目录挂载到容器内 `/app/data`：
+
+```bash
+chmod +x run.sh
+./run.sh
+```
+
+指定宿主机数据目录和端口：
+
+```bash
+./run.sh --data-dir /path/to/mpj-data --port 8000
+```
+
+启动脚本会自动删除同名旧容器并重新启动。默认镜像名为 `mpj:latest`，容器名为 `mpj`。
+
 默认账号：
 - 普通用户：`user@example.com` / `password`
 - 管理员：默认 `admin` / `Ad123654`

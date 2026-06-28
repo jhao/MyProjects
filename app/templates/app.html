@@ -9,12 +9,16 @@
 <body>
   <header class="topbar">
     <div class="brand"><span class="logo">MP</span><strong>事务项目管理系统</strong></div>
+    <nav class="main-nav">
+      <button class="nav-btn active" data-mode="project">项目管理</button>
+      <button class="nav-btn" data-mode="personal">个人事务管理</button>
+    </nav>
     <div class="top-actions"><span id="meName"></span><button id="logoutBtn" class="secondary small">退出</button></div>
   </header>
   <main class="page">
     <section class="metrics" id="metricsSection">
       <div class="metrics-body">
-        <div><span class="metric-label">项目总数</span><strong class="metric-value" id="metricTotal">0</strong></div>
+        <div><span class="metric-label" id="metricTotalLabel">项目总数</span><strong class="metric-value" id="metricTotal">0</strong></div>
         <div><span class="metric-label">当前页</span><strong class="metric-value" id="metricPage">1</strong></div>
         <div><span class="metric-label">已筛选</span><strong class="metric-value" id="metricFiltered">0</strong></div>
         <div><span class="metric-label">查询方式</span><strong class="metric-value">手动</strong></div>
@@ -29,7 +33,7 @@
       <div class="filters-body" id="filtersBody">
         <label class="wide">全文检索<input id="q" data-filter placeholder="项目名称 / 日志 / 文档"></label>
         <label>所属目录关键词<input id="folder" data-filter placeholder="重点客户 / 2026实施"></label>
-        <label>项目分类
+        <label><span id="categoryFilterLabel">项目分类</span>
           <div class="multi-select" id="categorySelect">
             <div class="multi-select-input">
               <div class="multi-select-tags" id="categoryTags"></div>
@@ -39,7 +43,7 @@
             <div class="multi-select-dropdown" id="categoryDropdown"></div>
           </div>
         </label>
-        <label>项目状态
+        <label><span id="statusFilterLabel">项目状态</span>
           <div class="multi-select" id="statusSelect">
             <div class="multi-select-input">
               <div class="multi-select-tags" id="statusTags"></div>
@@ -58,15 +62,15 @@
       <table>
         <thead>
           <tr>
-            <th><button class="sort desc" data-sort="name">项目名称</button></th>
+            <th><button class="sort desc" data-sort="name" id="nameSortBtn">项目名称</button></th>
             <th><button class="sort" data-sort="folder">所属目录</button></th>
             <th><button class="sort" data-sort="category">分类</button></th>
             <th><button class="sort" data-sort="start_date">启动日期</button></th>
-            <th>项目状态</th>
+            <th id="statusTh">项目状态</th>
             <th><button class="sort" data-sort="amounts"><span class="amount-contract">合同</span><span class="amount-invoice">/开票</span><span class="amount-receive">/回款</span></button></th>
             <th><button class="sort" data-sort="updated_at">最后更新</button></th>
             <th>最新日志</th>
-            <th><button class="sort" data-sort="next_node_date">下一步项目节点</button></th>
+            <th><button class="sort" data-sort="next_node_date" id="nextNodeSortBtn">下一步项目节点</button></th>
             <th><button class="sort" data-sort="milestone">里程碑</button></th>
             <th class="right">操作</th>
           </tr>
@@ -82,10 +86,10 @@
     <div class="drawer-content">
       <div class="drawer-head"><div><h2 id="drawerTitle"></h2><p id="drawerMeta" class="muted"></p></div><button id="closeDrawer" class="secondary small">关闭</button></div>
       <nav class="drawer-tabs">
-        <button class="active" data-tab="milestones">项目里程碑设计</button>
-        <button data-tab="logs">项目日志</button>
-        <button data-tab="documents">项目相关文档</button>
-        <button data-tab="people">项目相关人</button>
+        <button class="active" data-tab="milestones" id="milestonesTabBtn">项目里程碑设计</button>
+        <button data-tab="logs" id="logsTabBtn">项目日志</button>
+        <button data-tab="documents" id="documentsTabBtn">项目相关文档</button>
+        <button data-tab="people" id="peopleTabBtn">项目相关人</button>
       </nav>
       <section id="tab-milestones" class="tab-body"></section>
       <section id="tab-logs" class="tab-body hidden"></section>
