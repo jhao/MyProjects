@@ -124,8 +124,8 @@ def seed_defaults(conn):
         )
     else:
         conn.execute(
-            "update users set password_hash=?,nickname='系统管理员',status='active',updated_at=? where id=?",
-            (hash_password(Config.ADMIN_PASSWORD), now(), admin["id"]),
+            "update users set nickname='系统管理员',status='active',updated_at=? where id=?",
+            (now(), admin["id"]),
         )
     conn.execute("update users set status='frozen' where role='admin' and email<>?", (admin_username,))
     user = conn.execute("select id from users where email=?", ("user@example.com",)).fetchone()

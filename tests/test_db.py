@@ -22,6 +22,14 @@ class DatabaseTests(unittest.TestCase):
         self.assertTrue(db.verify_password("password", user["password_hash"]))
         self.assertFalse(db.verify_password("bad-password", user["password_hash"]))
 
+    def test_existing_admin_password_is_not_reset_by_seed(self):
+        admin = db.query_one("select * from users where email=?", ("admin",))
+        db.execute("update users set password_hash=? where id=?", (db.hash_password("changed123"), admin["id"]))
+        db.init_db(self.db_url)
+        admin = db.query_one("select * from users where email=?", ("admin",))
+        self.assertTrue(db.verify_password("changed123", admin["password_hash"]))
+        self.assertFalse(db.verify_password("Ad123654", admin["password_hash"]))
+
     def test_default_workspace_seeded(self):
         user = db.query_one("select * from users where email=?", ("user@example.com",))
         categories = db.query_all("select * from categories where user_id=?", (user["id"],))

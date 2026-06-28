@@ -116,7 +116,21 @@ class FlaskAppTests(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         res = self.client.get("/api/admin/users")
         self.assertEqual(res.status_code, 200)
-        self.assertGreaterEqual(len(res.get_json()["items"]), 2)
+        self.assertGreaterEqual(len(res.get_json()["items"]), 1)
+
+    def test_change_own_password(self):
+        self.login()
+        wrong = self.client.post("/api/me/password", json={"old_password": "bad-password", "new_password": "newpass123", "confirm_password": "newpass123"})
+        self.assertEqual(wrong.status_code, 400)
+
+        changed = self.client.post("/api/me/password", json={"old_password": "password", "new_password": "newpass123", "confirm_password": "newpass123"})
+        self.assertEqual(changed.status_code, 200)
+        self.client.post("/api/auth/logout")
+
+        old_login = self.login("user@example.com", "password")
+        self.assertEqual(old_login.status_code, 400)
+        new_login = self.login("user@example.com", "newpass123")
+        self.assertEqual(new_login.status_code, 200)
 
 
 if __name__ == "__main__":

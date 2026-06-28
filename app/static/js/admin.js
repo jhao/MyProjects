@@ -1,6 +1,12 @@
 let usersCache = [];
 let statusesCache = [];
 
+async function bootAdmin() {
+  const me = await api("/api/me");
+  document.getElementById("meName").textContent = me.user?.nickname || me.user?.email || "当前账号";
+  await Promise.all([loadUsers(), loadStatuses()]);
+}
+
 async function loadUsers() {
   const data = await api("/api/admin/users");
   usersCache = data.items;
@@ -97,4 +103,4 @@ function openStatusForm(id) {
   });
 }
 
-Promise.all([loadUsers(), loadStatuses()]).catch(err => toast(err.message));
+bootAdmin().catch(err => toast(err.message));

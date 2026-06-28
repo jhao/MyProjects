@@ -295,6 +295,26 @@ def logout():
     return jsonify({"message": "已退出"})
 
 
+@bp.post("/api/me/password")
+def change_own_password():
+    user, err = require_user()
+    if err:
+        return err
+    data = payload()
+    old_password = data.get("old_password") or ""
+    new_password = data.get("new_password") or ""
+    confirm_password = data.get("confirm_password") or ""
+    if len(new_password) < 6:
+        return jsonify({"error": "新密码至少 6 位"}), 400
+    if new_password != confirm_password:
+        return jsonify({"error": "两次输入的新密码不一致"}), 400
+    if not verify_password(old_password, user["password_hash"]):
+        return jsonify({"error": "当前密码错误"}), 400
+    execute("update users set password_hash=?,updated_at=? where id=?", (hash_password(new_password), now(), user["id"]))
+    audit(user["id"], "user", user["id"], "change_own_password")
+    return jsonify({"message": "密码已修改"})
+
+
 @bp.get("/api/me")
 def me():
     user = current_user()

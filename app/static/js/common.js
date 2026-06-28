@@ -38,11 +38,29 @@ function bytes(size) {
   return `${(size / 1024 / 1024 / 1024).toFixed(1)} GB`;
 }
 
+function openPasswordForm() {
+  openModal(`<h2>修改账号密码</h2><form id="passwordForm" class="form-grid">
+    <label class="full">当前密码<input name="old_password" type="password" autocomplete="current-password" required></label>
+    <label>新密码<input name="new_password" type="password" autocomplete="new-password" minlength="6" required></label>
+    <label>确认新密码<input name="confirm_password" type="password" autocomplete="new-password" minlength="6" required></label>
+    <div class="modal-actions full"><button type="button" class="secondary" data-close-modal>取消</button><button class="primary">保存</button></div>
+  </form>`);
+  document.getElementById("passwordForm").addEventListener("submit", async event => {
+    event.preventDefault();
+    const body = Object.fromEntries(new FormData(event.target));
+    await api("/api/me/password", { method: "POST", body });
+    closeModal();
+    toast("密码已修改");
+  });
+}
+
 document.addEventListener("click", async event => {
   if (event.target.id === "logoutBtn") {
     await api("/api/auth/logout", { method: "POST" });
     location.href = "/auth";
   }
+  if (event.target.closest("#accountPasswordBtn")) {
+    openPasswordForm();
+  }
   if (event.target.matches("[data-close-modal]")) closeModal();
 });
-

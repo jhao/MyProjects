@@ -8,12 +8,16 @@
 </head>
 <body>
   <header class="topbar">
-    <div class="brand"><span class="logo">MP</span><strong>事务项目管理系统</strong></div>
+    <div class="brand">
+      <span class="logo">MP</span>
+      <strong>事务项目管理系统</strong>
+      <button id="accountPasswordBtn" class="account-chip" type="button" title="修改账号密码"><span id="meName"></span></button>
+    </div>
     <nav class="main-nav">
       <button class="nav-btn active" data-mode="project">项目管理</button>
       <button class="nav-btn" data-mode="personal">个人事务管理</button>
     </nav>
-    <div class="top-actions"><span id="meName"></span><button id="logoutBtn" class="secondary small">退出</button></div>
+    <div class="top-actions"><button id="logoutBtn" class="secondary small">退出</button></div>
   </header>
   <main class="page">
     <section class="metrics" id="metricsSection">
